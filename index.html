@@ -196,5 +196,38 @@
 
         ReactDOM.render(<FollowUpWriter />, document.getElementById('app'));
     </script>
+
+<!-- LAUNCH BANNER — Injected by revenue-agent -->
+<div id="launch-banner" style="position:fixed;bottom:0;left:0;right:0;z-index:9999;background:linear-gradient(90deg,#7c3aed,#2563eb);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 -4px 24px rgba(0,0,0,.3);font-family:Inter,sans-serif">
+  <div>
+    <span style="font-size:13px;opacity:.8">🚀 LAUNCH WEEK OFFER</span>
+    <div style="font-size:17px;font-weight:700">Get FollowUp Writer for $19 <span style="text-decoration:line-through;opacity:.6;font-weight:400">$38</span> — lifetime access</div>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center">
+    <a href="https://buy.stripe.com/test_bJeeV67rsawK8TY5cvg7e0g" target="_blank"
+       style="background:#fff;color:#7c3aed;padding:10px 22px;border-radius:8px;font-weight:800;font-size:15px;text-decoration:none;white-space:nowrap">
+      Buy Now →
+    </a>
+    <button onclick="document.getElementById('launch-banner').style.display='none'" style="background:transparent;border:none;color:#fff;opacity:.6;cursor:pointer;font-size:20px;padding:0 4px">✕</button>
+  </div>
+</div>
+<script>
+  // Countdown timer — 24h from page load
+  const TIMER_KEY = 'offer_end_' + 'followup-writer-tool';
+  let endTime = localStorage.getItem(TIMER_KEY);
+  if (!endTime) { endTime = Date.now() + 24 * 3600 * 1000; localStorage.setItem(TIMER_KEY, endTime); }
+  const banner = document.getElementById('launch-banner');
+  function updateTimer() {
+    const left = Math.max(0, endTime - Date.now());
+    const h = Math.floor(left / 3600000);
+    const m = Math.floor((left % 3600000) / 60000);
+    const s = Math.floor((left % 60000) / 1000);
+    const el = document.getElementById('banner-timer');
+    if (el) el.textContent = `Offer expires in ${h}h ${m}m ${s}s`;
+    if (left === 0 && banner) banner.style.display = 'none';
+  }
+  setInterval(updateTimer, 1000);
+  setTimeout(() => { banner.parentNode.insertBefore(Object.assign(document.createElement('div'), {id:'banner-timer',style:'font-size:11px;opacity:.7;margin-top:2px'}), banner.querySelector('div').nextSibling); }, 100);
+</script>
 </body>
 </html>

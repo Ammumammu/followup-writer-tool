@@ -19,219 +19,182 @@
             min-height: 100vh;
         }
         .container {
-            background-color: #1e293b;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 90%;
             max-width: 600px;
-            width: 100%;
             text-align: center;
         }
         h1, h2 {
             color: #ffffff;
         }
-        input, button {
-            padding: 1rem;
-            margin-top: 1rem;
-            border: none;
-            border-radius: 4px;
-            font-size: 1rem;
-        }
-        input {
-            width: calc(100% - 2rem);
-            background-color: #334155;
-            color: #ffffff;
+        p {
+            color: #a1a1aa;
         }
         button {
             background-color: #6366f1;
             color: #ffffff;
+            border: none;
+            padding: 10px 20px;
             cursor: pointer;
-            transition: background-color 0.3s;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-top: 20px;
         }
         button:hover {
             background-color: #4f46e5;
         }
-        .cta, .paywall-cta {
-            margin-top: 2rem;
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            margin-top: 20px;
+        }
+        input {
+            background-color: #1e293b;
+            color: #ffffff;
+            border: 1px solid #4b5563;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+        textarea {
+            background-color: #1e293b;
+            color: #ffffff;
+            border: 1px solid #4b5563;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            height: 100px;
         }
         .viral-attribution {
-            font-size: 0.8rem;
-            color: #94a3b8;
-            margin-top: 1rem;
-        }
-        .paywall {
-            text-align: center;
-        }
-        .paywall h2 {
-            margin-bottom: 0.5rem;
-        }
-        .paywall p {
-            margin-bottom: 1rem;
-        }
-        .paywall a {
-            color: #6366f1;
-            text-decoration: none;
-        }
-        .paywall a:hover {
-            text-decoration: underline;
-        }
-        .email-input {
-            margin-top: 1rem;
+            font-size: 12px;
+            margin-top: 10px;
+            color: #a1a1aa;
         }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="app"></div>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/posthog-js"></script>
     <script type="text/babel">
         const CONFIG = {
             GROQ_KEY: 'CONFIG.GROQ_KEY',
             SUPABASE_ANON_KEY: 'your-supabase-anon-key',
-            SUPABASE_URL: 'https://your-supabase-url.supabase.co'
+            SUPABASE_URL: 'your-supabase-url'
         };
 
-        const posthog = new PostHog('your-posthog-token', { api_host: 'https://app.posthog.com' });
+        const posthog = new PostHog('phc_placeholder', { api_host: 'https://app.posthog.com' });
 
-        const LeadCapture = ({ onCapture }) => {
+        const useAI = async (prompt) => {
+            const response = await fetch('https://api.groq.com/v1/engines/llama3-70b/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${CONFIG.GROQ_KEY}`
+                },
+                body: JSON.stringify({
+                    prompt: prompt,
+                    max_tokens: 150
+                })
+            });
+            const data = await response.json();
+            return data.choices[0].text.trim();
+        };
+
+        const captureLead = async (email) => {
+            const supabaseUrl = CONFIG.SUPABASE_URL;
+            const supabaseKey = CONFIG.SUPABASE_ANON_KEY;
+            const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@latest');
+            const supabase = createClient(supabaseUrl, supabaseKey);
+            await supabase.from('leads').insert([{ email }]);
+        };
+
+        const FollowUpWriter = () => {
+            const [view, setView] = React.useState('landing');
+            const [freeUses, setFreeUses] = React.useState(2);
+            const [emailTemplate, setEmailTemplate] = React.useState('');
+            const [customizedEmail, setCustomizedEmail] = React.useState('');
             const [email, setEmail] = React.useState('');
 
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                onCapture(email);
-                setEmail('');
-            };
-
-            return (
-                <form onSubmit={handleSubmit}>
-                    <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Enter your email"
-                        required
-                    />
-                    <button type="submit">Get 3 More Free Uses</button>
-                </form>
-            );
-        };
-
-        const Paywall = ({ onPaymentClick, onEmailCapture }) => {
-            posthog.capture('paywall_shown');
-
-            return (
-                <div className="paywall">
-                    <h2>Upgrade to Use More</h2>
-                    <p>Get unlimited follow-up emails for just $9/mo.</p>
-                    <div className="cta">
-                        <button onClick={onPaymentClick}>
-                            Upgrade Now
-                        </button>
-                    </div>
-                    <div className="email-input">
-                        <LeadCapture onCapture={onEmailCapture} />
-                    </div>
-                </div>
-            );
-        };
-
-        const Tool = ({ onFreeLimitHit }) => {
-            const [leadName, setLeadName] = React.useState('');
-            const [lastEmail, setLastEmail] = React.useState('');
-            const [suggestion, setSuggestion] = React.useState('');
-            const [uses, setUses] = React.useState(0);
-            const [showPaywall, setShowPaywall] = React.useState(false);
-
-            const generateSuggestion = async () => {
-                if (uses >= 2) {
-                    setShowPaywall(true);
-                    posthog.capture('free_limit_hit');
-                    onFreeLimitHit();
-                    return;
-                }
-
-                posthog.capture('tool_used');
-
-                const response = await fetch('https://api.groq.com/v1/infer', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${CONFIG.GROQ_KEY}`
-                    },
-                    body: JSON.stringify({
-                        model: 'llama3-70b',
-                        prompt: `Craft a follow-up email for ${leadName} regarding their last email: "${lastEmail}". The email should be professional and encourage a response.`
-                    })
-                });
-
-                const data = await response.json();
-                setSuggestion(data.result[0].text);
-                setUses(uses + 1);
-            };
-
             React.useEffect(() => {
-                posthog.capture('tool_opened');
-            }, []);
+                if (view === 'tool') {
+                    posthog.capture('tool_opened');
+                }
+            }, [view]);
 
-            return (
-                <div>
-                    <h1>FollowUp Writer</h1>
-                    <p>Enter lead name and last email to get a suggested follow-up email.</p>
-                    <input
-                        type="text"
-                        value={leadName}
-                        onChange={(e) => setLeadName(e.target.value)}
-                        placeholder="Lead Name"
-                        required
-                    />
-                    <input
-                        type="text"
-                        value={lastEmail}
-                        onChange={(e) => setLastEmail(e.target.value)}
-                        placeholder="Last Email Content"
-                        required
-                    />
-                    <button onClick={generateSuggestion}>Generate Suggestion</button>
-                    {suggestion && (
-                        <div>
-                            <h2>Suggested Follow-Up Email:</h2>
-                            <p>{suggestion}</p>
-                            <p className="viral-attribution">Generated by FollowUp Writer — followup-writer-tool.vercel.app</p>
-                        </div>
-                    )}
-                    {showPaywall && <Paywall onPaymentClick={() => window.location.href = 'https://buy.stripe.com/test_7sYdR25jk34i7PU0Wfg7e02'} onEmailCapture={() => setUses(0)} />}
-                </div>
-            );
-        };
+            const handleTemplateSelect = (template) => {
+                setEmailTemplate(template);
+                setView('tool');
+            };
 
-        const Landing = () => {
-            return (
-                <div>
-                    <h1>Leads Not Responding? Get Instant Follow-Ups</h1>
-                    <h2>Craft perfect follow-up emails in seconds, without writing a word</h2>
-                    <p>Enter lead name and last email → Get suggested follow-up email → Send and track responses</p>
-                    <div className="cta">
-                        <button onClick={() => ReactDOM.render(<Tool onFreeLimitHit={() => setShowPaywall(true)} />, document.getElementById('root'))}>
-                            Start Writing Perfect Follow-Ups Today
-                        </button>
-                    </div>
-                </div>
-            );
-        };
+            const handleCustomizeEmail = async () => {
+                const prompt = `Generate a follow-up email based on this template: ${emailTemplate}.`;
+                const response = await useAI(prompt);
+                setCustomizedEmail(response);
+                posthog.capture('tool_used');
+                setFreeUses(freeUses - 1);
+                if (freeUses === 1) {
+                    posthog.capture('free_limit_hit');
+                }
+            };
 
-        const App = () => {
-            const [showPaywall, setShowPaywall] = React.useState(false);
+            const handlePaywall = () => {
+                setView('paywall');
+                posthog.capture('paywall_shown');
+            };
+
+            const handlePaymentClick = () => {
+                window.location.href = 'https://buy.stripe.com/placeholder-followup-writer-tool';
+                posthog.capture('payment_clicked');
+            };
+
+            const handleEmailCapture = async (e) => {
+                e.preventDefault();
+                await captureLead(email);
+                setFreeUses(freeUses + 3);
+                setEmail('');
+                setView('tool');
+                posthog.capture('email_captured');
+            };
 
             return (
                 <div className="container">
-                    {!showPaywall ? <Landing /> : <Paywall onPaymentClick={() => window.location.href = 'https://buy.stripe.com/test_7sYdR25jk34i7PU0Wfg7e02'} onEmailCapture={() => setShowPaywall(false)} />}
+                    {view === 'landing' && (
+                        <>
+                            <h1>Leads Lost</h1>
+                            <h2>Sales teams craft effective follow-ups in seconds</h2>
+                            <p>Choose template (5 sec) → Customize with AI (10 sec) → Send converting email (instant)</p>
+                            <button onClick={() => handleTemplateSelect('You have shown great interest in our product. Let’s schedule a call to discuss how it can benefit your business.')}>Send Winning Emails</button>
+                        </>
+                    )}
+                    {view === 'tool' && (
+                        <>
+                            <h1>Customize Your Follow-Up</h1>
+                            <textarea value={customizedEmail} readOnly></textarea>
+                            <button onClick={handleCustomizeEmail} disabled={freeUses === 0}>Customize with AI</button>
+                            {freeUses === 0 && <button onClick={handlePaywall}>Upgrade to Unlock More Uses</button>}
+                            <div className="viral-attribution">Generated by FollowUp Writer — followup-writer-tool.vercel.app</div>
+                        </>
+                    )}
+                    {view === 'paywall' && (
+                        <>
+                            <h1>Upgrade to FollowUp Writer</h1>
+                            <p>Get unlimited follow-up emails for $9/mo</p>
+                            <button onClick={handlePaymentClick}>Upgrade Now</button>
+                            <form onSubmit={handleEmailCapture}>
+                                <div className="form-group">
+                                    <label htmlFor="email">Get 3 Free Uses by signing up:</label>
+                                    <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                                    <button type="submit">Sign Up</button>
+                                </div>
+                            </form>
+                        </>
+                    )}
                 </div>
             );
         };
 
-        ReactDOM.render(<App />, document.getElementById('root'));
+        ReactDOM.render(<FollowUpWriter />, document.getElementById('app'));
     </script>
 </body>
 </html>
